@@ -8,11 +8,13 @@ trace/render_costs.csv and SPEND.md.  Cost = Vertex job billed seconds x public 
 import argparse, csv, datetime as dt, glob, json, math, os, re, shutil, subprocess, sys, tempfile, time, urllib.request, urllib.parse
 
 ENG = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from env_paths import find_blender, find_gcloud
 FARM = os.environ.get('ENGINE_FARM_DIR', os.path.join(ENG, 'farm'))   # env overrides: see research/PORTABILITY.md
 PRICES = os.path.join(FARM, 'prices.json')
-GC = os.environ.get('GCLOUD') or os.path.expandvars(r'%LOCALAPPDATA%\Google\Cloud SDK\google-cloud-sdk\bin\gcloud.cmd')
-GSUTIL = os.environ.get('GSUTIL') or os.path.expandvars(r'%LOCALAPPDATA%\Google\Cloud SDK\google-cloud-sdk\bin\gsutil.cmd')
-BLENDER = os.environ.get('BLENDER', r'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe')
+GC = find_gcloud('gcloud')
+GSUTIL = find_gcloud('gsutil')
+BLENDER = find_blender()
 PROJECT = os.environ.get('ENGINE_GCP_PROJECT', ''); BUCKET = os.environ.get('ENGINE_GCP_BUCKET', PROJECT + '-farm')
 def image(region):   # replicated per region (Artifact Registry repo 'farm' in each) so spot GPUs pull locally, not across continents
     return f'{region}-docker.pkg.dev/{PROJECT}/farm/blender:5.2.3'

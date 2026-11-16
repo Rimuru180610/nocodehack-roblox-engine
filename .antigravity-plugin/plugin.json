@@ -1,0 +1,27 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "nocodehack",
+  "displayName": "NoCodeHack Roblox Engine",
+  "version": "1.11.1",
+  "description": "Makes 9:16 animated Roblox-style YouTube Shorts in Blender from one prompt: story, checks, camera, VFX, voices, and sound.",
+  "suggestedPrompts": [
+    "use the nocodehack skill to set up and fill the Roblox Studio libraries",
+    "use the nocodehack skill to make a Short about a kid who tries to hide a bad grade from his mom",
+    "use the nocodehack skill to make a POV Short where you're the new kid at school"
+  ],
+  "author": {
+    "name": "NoCodeHack",
+    "url": "https://www.youtube.com/@nocodehack"
+  },
+  "homepage": "https://www.youtube.com/@nocodehack",
+  "repository": "https://github.com/Rimuru180610/nocodehack-roblox-engine",
+  "license": "Apache-2.0",
+  "keywords": [
+    "roblox",
+    "blender",
+    "animation",
+    "youtube-shorts",
+    "3d",
+    "video"
+  ]
+}

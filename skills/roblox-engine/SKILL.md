@@ -1,6 +1,6 @@
 ---
 name: roblox-engine
-description: The NoCodeHack Roblox Engine (the "nocodehack skill"). Makes animated Roblox-style YouTube Shorts (9:16) from one line - Claude writes the story, the engine animates characters, camera, effects and sound in Blender. Use whenever the user says "use the nocodehack skill to ...", "nocodehack", or asks to make, change or re-render a Roblox-style animated Short.
+description: The NoCodeHack Roblox Engine (the "nocodehack skill"). Makes animated Roblox-style YouTube Shorts (9:16) from one line - Antigravity writes the story, the engine animates characters, camera, effects and sound in Blender. Use whenever the user says "use the nocodehack skill to ...", "nocodehack", "/roblox-engine", or asks to make, change or re-render a Roblox-style animated Short.
 ---
 
 # NoCodeHack Roblox Engine
@@ -8,10 +8,10 @@ description: The NoCodeHack Roblox Engine (the "nocodehack skill"). Makes animat
 You make animated Roblox-style Shorts. You never animate by hand: you write ONE file, `stories/<name>/story.json`, and the engine (Blender) builds, checks and renders it.
 
 ## 1. Start (steps 1-3 at the start of every session; step 4 and later only while something is missing)
-1. If `./nocodehack-engine/` does not exist in the current project folder, copy this skill's `engine/` folder there
-   (this skill's folder is the "Base directory" shown when the skill loads). All commands below run inside `./nocodehack-engine/`.
-   UPDATE: if it exists but `./nocodehack-engine/VERSION` is missing or differs from this skill's `engine/VERSION`, copy every
-   file of this skill's `engine/` over it, except `stories/<name>/` folders that already exist (the user's work). Fetched
+1. Locate this skill's `engine/` folder: check `<skill_dir>/engine/` first (when loaded from `skills/roblox-engine`, a plugin install, or `~/.gemini/config/skills/roblox-engine`), then `<workspace>/skills/roblox-engine/engine/` or `<workspace>/*/nocodehack-roblox-engine/skills/roblox-engine/engine/` (when loaded via `.agents/skills/roblox-engine` or an account-wide skill). If none exist locally, ask the user to open or clone the repository first.
+   If `./nocodehack-engine/` does not exist in the current project folder, copy that `engine/` folder there. All commands below run inside `./nocodehack-engine/` (use `python`, or `python3` on macOS/Linux if `python` is unavailable).
+   UPDATE: if `./nocodehack-engine/` exists but `./nocodehack-engine/VERSION` is missing or differs from the source `engine/VERSION`, copy every
+   file of `engine/` over it, except `stories/<name>/` folders that already exist (the user's work). Fetched
    Roblox files, renders and `.env` are not in `engine/`, so they stay. Then tell the user in one line: "Engine updated to
    <version>, changes: https://github.com/nocodehack/nocodehack-roblox-engine/blob/main/CHANGELOG.md", run
    `python tools/fetch_library.py status`, and for every line that is missing redo step 4 (`public` first, then the Studio jobs only if
@@ -20,18 +20,21 @@ You make animated Roblox-style Shorts. You never animate by hand: you write ONE 
    Setup video and full guide: https://youtu.be/w4tLb_7Ttvs / https://guide.nocodehack.io/guides/roblox-shorts-with-claude
    then create that empty file. Never repeat it, never remind them later.
 3. Every time this skill is used (once per session): run `python tools/check_update.py`. On `UPDATE <new>` tell the user, in one
-   short message: "A new version of the NoCodeHack engine is out (<new>). Run `/plugin marketplace update nocodehack-roblox-engine`,
+   short message: "A new version of the NoCodeHack engine is out (<new>). Update your install (`git pull` in your clone, `agy plugin update` / re-install, or re-copy `skills/roblox-engine`),
    then say continue. What changed: https://github.com/nocodehack/nocodehack-roblox-engine/blob/main/CHANGELOG.md" and wait.
    On `OK` say nothing and go on.
    Run `python tools/check_machine.py`. If Blender, ffmpeg or the Python packages are missing, explain the fix in plain words and
-   stop until they pass. MISSING lines for the Roblox libraries are fixed by step 4.
+   stop until they pass (`tools/env_paths.py` auto-detects Blender 5.2 across Windows, macOS and Linux, or set `BLENDER=/path/to/blender`). MISSING lines for the Roblox libraries are fixed by step 4.
 4. Roblox libraries (REQUIRED: hair, faces, clothes, animations, sets). They are not in the download; they are rebuilt on this
    machine from Roblox. Run `python tools/fetch_library.py status`. If items are missing:
    - `python tools/fetch_library.py public` (faces, clothes and the anime aura flames, automatic, ~5 min).
-   - Tell the user, in one short message: "Open Roblox Studio (any place, Edit mode, logged in) with the Studio MCP connected, and
+   - If hair, animations or sets are missing: first check whether this session runs **locally on the user's PC** with Roblox Studio access (Studio MCP tools such as `execute_luau` / `insert_asset` are available, or Studio is installed on this OS — not a remote cloud sandbox). If running in a remote/cloud sandbox that cannot reach local Roblox Studio, stop here and tell the user clearly to run this step in a **local Antigravity IDE / App / CLI** session on their PC with Roblox Studio open and connected via MCP.
+   - Otherwise, tell the user, in one short message: "Open Roblox Studio (any place, Edit mode, logged in) with the Studio MCP connected to Antigravity, and
      tell me when it is open. I will grab the hair, animations and sets from it (~20 min). Nothing is saved or published."
-     When they confirm, run `python tools/fetch_library.py jobs` and do every step of `library/jobs/JOBS.md` in order with the
-     Roblox Studio MCP tools, then `status`. Do not make a Short until the jobs have run and faces, clothes, anims and sets
+   - If Roblox Studio MCP is not connected to Antigravity yet, explain the setup and wait:
+     In Roblox Studio, open **Assistant -> `...` -> Settings (or Manage MCP Servers) -> MCP Servers**, turn on **Enable Studio as MCP server**, and enable **Antigravity** under **Quick connect**; or open Antigravity **MCP Servers -> Manage MCP Servers -> View raw config** (`~/.gemini/config/mcp_config.json` or `.agents/mcp_config.json`) and add `"Roblox_Studio"` (Windows: `{"command": "cmd.exe", "args": ["/c", "%LOCALAPPDATA%\\Roblox\\mcp.bat"]}`, macOS: `{"command": "/Applications/RobloxStudio.app/Contents/MacOS/StudioMCP"}`), then restart both Studio and Antigravity until Studio shows `1 client connected`.
+   - When they confirm, run `python tools/fetch_library.py jobs` and do every step of `library/jobs/JOBS.md` in order with the
+     Roblox Studio MCP tools (using `call_mcp_tool` or the Studio MCP tools directly; pass `studio_id` from `list_roblox_studios` when prompted). For `anim_dump`, if your MCP client returns JSON inline instead of saving a file, save that returned JSON text to e.g. `library/jobs/anims_01_out.json` first and pass it to `python tools/fetch_library.py collect anims ...`. Then run `status`. Do not make a Short until the jobs have run and faces, clothes, anims and sets
      are complete. Roblox refuses some hair downloads (the tool also tries a public route): a few missing hairs are normal;
      `story_lint` flags a missing `lib:` hair, so pick another hair from `assets/hair/` or a built-in style (r6 parts are optional). If Studio or its MCP is not installed, explain how to install both and wait.
 

@@ -42,8 +42,10 @@ def queue(kind, kw, tag, n):
 
 
 def log_rows():
-    logs_ = list((Path(os.environ['LOCALAPPDATA']) / 'Roblox' / 'logs').glob('*Studio*'))
-    if not logs_: raise SystemExit('no Roblox Studio logs found - open Studio and run the batch first')
+    from env_paths import roblox_logs_dir
+    logs_dir = roblox_logs_dir()
+    logs_ = list(logs_dir.glob('*Studio*')) if logs_dir and logs_dir.exists() else []
+    if not logs_: raise SystemExit(f'no Roblox Studio logs found (checked {logs_dir or "LOCALAPPDATA/Roblox/logs"}) - open Studio and run the batch first')
     lg = max(logs_, key=lambda p: p.stat().st_mtime); rows = {}
     for ln in lg.read_text(encoding='utf-8', errors='replace').splitlines():
         i = ln.find('OUTFITJSON ')

@@ -5,11 +5,17 @@ No account yet? Sign up: https://blotato.com/?ref=nocodehack
 Blotato API needs a paid plan (not the free trial). Verified against the docs on 2026-11-13, not against a live key.
 
 ## Option 1: official hosted MCP server (OAuth, no key pasted)
+In Google Antigravity, add Blotato to your MCP config (`~/.gemini/config/mcp_config.json` or workspace `.agents/mcp_config.json`, or in Antigravity IDE open **MCP Servers -> Manage MCP Servers -> View raw config**):
+```json
+{
+  "mcpServers": {
+    "Blotato": {
+      "serverUrl": "https://mcp.blotato.com/mcp"
+    }
+  }
+}
 ```
-claude mcp add --transport http Blotato https://mcp.blotato.com/mcp
-```
-Then in Claude Code run `/mcp`, choose `Blotato > Authenticate`, approve in the browser. Tools: `blotato_list_accounts`,
-`blotato_create_post`, `blotato_get_post_status`. Uses the logged-in browser session, so no API key is involved.
+Then authenticate in Antigravity (**Customizations -> Installed -> MCP Servers -> Authenticate** in the App/IDE, or `/mcp` in Antigravity CLI) and approve in the browser. (In Claude Code: `claude mcp add --transport http Blotato https://mcp.blotato.com/mcp`, then `/mcp` -> `Blotato > Authenticate`.) Tools: `blotato_list_accounts`, `blotato_create_post`, `blotato_get_post_status`. Uses the logged-in browser session, so no API key is involved.
 Source: https://www.blotato.com/blog/how-to-post-to-youtube-with-claude , https://www.blotato.com/api/youtube
 
 ## Option 2: our script `tools/post_blotato.py` (REST + API key)
@@ -22,7 +28,7 @@ https://help.blotato.com/rest-api-reference/publish-post/upload-media-v2-media.m
 - YouTube target: `title` (max 100), `privacyStatus` private|unlisted|public, `shouldNotifySubscribers`; optional `isMadeForKids`, `playlistIds`, `thumbnailUrl`. Description = `content.text` (max 5000). No tags. Vertical video under 3 min becomes a Short automatically (no Shorts flag).
 - Limits: 10 uploads per channel per 24 h on Starter, 25 on Creator/Agency; 400 MB (Starter) / 1 GB file size; per-second request limits not documented.
 
-## Prompt 1: "connect Blotato to Claude Code with my API key <key>, keep the key private, and list my connected accounts"
+## Prompt 1: "connect Blotato with my API key <key>, keep the key private, and list my connected accounts"
 1. Run `python tools/post_blotato.py setkey <key>` (writes `BLOTATO_API_KEY` to `<engine>/.env`, adds `.env` to `.gitignore`; prints only the last 4 characters).
 2. Never echo the key again, never put it in any other file, command log, commit or message.
 3. Run `python tools/post_blotato.py accounts` and show the table (id, platform, name).

@@ -4,7 +4,9 @@ Blender worker (one set):  blender -b --factory-startup --offline-mode -P tools/
 import json, math, subprocess, sys
 from pathlib import Path
 E = Path(__file__).resolve().parents[1]
-BL = 'C:/Program Files/Blender Foundation/Blender 5.2/blender.exe'
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from env_paths import find_blender
+BL = find_blender()
 
 
 def worker(sdir):

@@ -103,7 +103,7 @@ def jobs():
     for i, b in enumerate(parts):
         lua = ', '.join('{slug = "%s", id = "%s", name = "%s"}' % (s, x['id'], x['name']) for s, x in b)
         f = JOBS / f'anims_{i + 1:02d}.luau'; f.write_text(re.sub(r'local JOBS = \{.*\}\}', 'local JOBS = {%s}' % lua, ad, count=1), encoding='utf-8')
-        steps.append(f'execute_luau (Edit) with `{f.relative_to(E).as_posix()}` -> it returns a file path: `python tools/fetch_library.py collect anims <that file>`')
+        steps.append(f'execute_luau (Edit) with `{f.relative_to(E).as_posix()}` -> save the returned JSON to a file if the MCP did not already save one, then `python tools/fetch_library.py collect anims <that file>`')
     ex, me = (E / 'tools' / 'rbx_set_export.luau').read_text(encoding='utf-8'), (E / 'tools' / 'rbx_set_meshes.luau').read_text(encoding='utf-8')
     for m in missing('rbxsets'):
         sid = m.name.split('_', 1)[0]

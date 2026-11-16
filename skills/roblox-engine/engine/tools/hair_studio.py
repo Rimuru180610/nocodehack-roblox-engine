@@ -11,10 +11,25 @@ E = Path(__file__).resolve().parents[1]
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hair_fetch import mesh_to_obj, OUT
+from env_paths import roblox_logs_dir, roblox_storage_dirs
 
-RBX = Path(os.environ['LOCALAPPDATA']) / 'Roblox'
 SIGS = {b'version ': 'mesh', b'\xabKTX 20': 'ktx', b'\x89PNG': 'png'}
 BC = {131: 'bc1', 132: 'bc1', 133: 'bc1', 134: 'bc1', 135: 'bc2', 136: 'bc2', 137: 'bc3', 138: 'bc3', 145: 'bc7', 146: 'bc7'}
+
+
+def _storage_roots():
+    roots = [r for r in roblox_storage_dirs() if (r / 'rbx-storage').exists() or (r / 'rbx-storage.db').exists()]
+    if not roots:
+        raise SystemExit('Roblox Studio cache (rbx-storage / rbx-storage.db) not found - run on the PC with Roblox Studio or set ROBLOX_DIR')
+    return roots
+
+
+def studio_logs():
+    logs_dir = roblox_logs_dir()
+    logs_ = list(logs_dir.glob('*Studio*')) if logs_dir and logs_dir.exists() else []
+    if not logs_:
+        raise SystemExit(f'no Roblox Studio logs found (checked {logs_dir or "LOCALAPPDATA/Roblox/logs"}) - open Studio and run the batch first, or set ROBLOX_LOGS_DIR')
+    return logs_
 
 
 def payload(b):
@@ -31,38 +46,70 @@ _HEADS = {}
 def _heads():
     """First 600 bytes of every cache file (RBXH header with the source URL), read once per run."""
     if not _HEADS:
-        for f in (RBX / 'rbx-storage').glob('*/*'):
-            try:
-                with open(f, 'rb') as h: _HEADS[f] = h.read(600)
-            except OSError: pass
+        for root in _storage_roots():
+            for f in (root / 'rbx-storage').glob('*/*'):
+                try:
+                    with open(f, 'rb') as h: _HEADS[f] = h.read(600)
+                except OSError: pass
     return _HEADS
 
 
 def entries(t0, t1):
     """All cache payloads written in [t0, t1] ms: big ones are files, small ones live inline in the sqlite db."""
     got = []
-    for f in (RBX / 'rbx-storage').glob('*/*'):
-        if t0 <= f.stat().st_mtime * 1000 <= t1:
-            k, body = payload(f.read_bytes())
-            if k: got.append((k, body))
-    tmp = Path(tempfile.mkdtemp())
-    for ext in ('', '-wal', '-shm'):   # copy: Studio holds the live db open
-        p = RBX / f'rbx-storage.db{ext}'
-        if p.exists(): shutil.copy(p, tmp / f'db{ext}')
-    c = sqlite3.connect(tmp / 'db')
-    for content, in c.execute('select content from files where atime between ? and ? and content is not null', (t0, t1)):
-        k, body = payload(content)
-        if k: got.append((k, body))
     urls = set()   # cache HIT: Studio only touches a small header row (URL); the body sits in an older file that starts with the same URL
-    for content, in c.execute('select content from files where atime between ? and ? and content is not null', (t0, t1)):
-        if content[:4] == b'RBXH' and payload(content)[0] is None:
-            n = int.from_bytes(content[8:12], 'little'); urls.add(content[12:12 + n])
-    if urls:
-        for f, head in _heads().items():
-            if any(u in head for u in urls) and not t0 <= f.stat().st_mtime * 1000 <= t1:
-                k, body = payload(f.read_bytes())
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        for idx, root in enumerate(_storage_roots()):
+            for f in (root / 'rbx-storage').glob('*/*'):
+                if t0 <= f.stat().st_mtime * 1000 <= t1:
+                    k, body = payload(f.read_bytes())
+                    if k: got.append((k, body))
+            if not (root / 'rbx-storage.db').exists():
+                continue
+            for ext in ('', '-wal', '-shm'):   # copy: Studio holds the live db open
+                p = root / f'rbx-storage.db{ext}'
+                if p.exists(): shutil.copy(p, tmp / f'db_{idx}{ext}')
+            c = sqlite3.connect(tmp / f'db_{idx}')
+            for content, in c.execute('select content from files where atime between ? and ? and content is not null', (t0, t1)):
+                k, body = payload(content)
                 if k: got.append((k, body))
-    c.close()
+                elif content[:4] == b'RBXH':
+                    n = int.from_bytes(content[8:12], 'little'); urls.add(content[12:12 + n])
+            c.close()
+        if urls:
+            for f, head in _heads().items():
+                if any(u in head for u in urls) and not t0 <= f.stat().st_mtime * 1000 <= t1:
+                    k, body = payload(f.read_bytes())
+                    if k: got.append((k, body))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return got
+
+
+def cache_entries(t0, t1):
+    """(mtime_ms, kind, body) of every content-cache payload written/read in [t0, t1]."""
+    got = []
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        for idx, root in enumerate(_storage_roots()):
+            for f in (root / 'rbx-storage').glob('*/*'):
+                t = f.stat().st_mtime * 1000
+                if t0 <= t <= t1:
+                    k, body = payload(f.read_bytes())
+                    if k: got.append((t, k, body))
+            if not (root / 'rbx-storage.db').exists():
+                continue
+            for ext in ('', '-wal', '-shm'):
+                p = root / f'rbx-storage.db{ext}'
+                if p.exists(): shutil.copy(p, tmp / f'db_{idx}{ext}')
+            c = sqlite3.connect(tmp / f'db_{idx}')
+            for t, content in c.execute('select atime, content from files where atime between ? and ? and content is not null', (t0, t1)):
+                k, body = payload(content)
+                if k: got.append((t, k, body))
+            c.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
     return got
 
 
@@ -83,8 +130,7 @@ def ktx2_png(b, path):
 
 def log_rows():
     """HAIRJSON lines printed by hair_batch.luau, from the newest Studio log (last row per id wins)."""
-    logs_ = list((RBX / 'logs').glob('*Studio*'))
-    if not logs_: raise SystemExit('no Roblox Studio logs found - open Studio and run the batch first')
+    logs_ = studio_logs()
     lg = max(logs_, key=lambda p: p.stat().st_mtime)
     rows = {}
     for ln in lg.read_text(encoding='utf-8', errors='replace').splitlines():
@@ -138,19 +184,28 @@ def tex_sig(img):
 def _all_payloads():
     """Every payload in Studio's content cache (files + inline sqlite rows), whatever its age."""
     got = []
-    for f in (RBX / 'rbx-storage').glob('*/*'):
-        try: k, b = payload(f.read_bytes())
-        except OSError: continue
-        if k: got.append((k, b))
     tmp = Path(tempfile.mkdtemp())
-    for ext in ('', '-wal', '-shm'):
-        p = RBX / f'rbx-storage.db{ext}'
-        if p.exists(): shutil.copy(p, tmp / f'db{ext}')
-    c = sqlite3.connect(tmp / 'db')
-    for content, in c.execute('select content from files where content is not null'):
-        k, b = payload(content)
-        if k: got.append((k, b))
-    c.close()
+    try:
+        for idx, root in enumerate(_storage_roots()):
+            for f in (root / 'rbx-storage').glob('*/*'):
+                try: k, b = payload(f.read_bytes())
+                except OSError: continue
+                if k: got.append((k, b))
+            if not (root / 'rbx-storage.db').exists():
+                continue
+            for ext in ('', '-wal', '-shm'):
+                p = root / f'rbx-storage.db{ext}'
+                if p.exists(): shutil.copy(p, tmp / f'db_{idx}{ext}')
+            c = sqlite3.connect(tmp / f'db_{idx}')
+            try:
+                for content, in c.execute('select content from files where content is not null'):
+                    k, b = payload(content)
+                    if k: got.append((k, b))
+            finally:
+                c.close()
+    except Exception:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
     return got, tmp
 
 
@@ -174,35 +229,37 @@ def scan_cache(dirs, max_diff=0.03):
                     want_t[d] = (s, size)
     if not want_m and not want_t: return 0, 0
     got, tmp = _all_payloads(); nm = nt = 0
-    for k, body in got:
-        if k != 'mesh' or not want_m: continue
-        o = tmp / 'm.obj'
-        try: vt = mesh_to_obj(body, o)
-        except Exception: continue
-        for d in want_m.pop(tuple(vt), []): shutil.copy(o, d / 'mesh.obj'); nm += 1
-    if want_t:
-        cand = []
-        for i, (k, body) in enumerate(got):
-            if k not in ('ktx', 'png'): continue
-            try:
-                if k == 'png': im = Image.open(io.BytesIO(body))
-                else: ktx2_png(body, tmp / 't.png'); im = Image.open(tmp / 't.png')
-                im.load(); cand.append((np.asarray(im.convert('RGB').resize((16, 16), Image.BILINEAR), dtype=np.float32) / 255, k, body, im.size))
+    try:
+        for k, body in got:
+            if k != 'mesh' or not want_m: continue
+            o = tmp / 'm.obj'
+            try: vt = mesh_to_obj(body, o)
             except Exception: continue
-        for d, (s, size) in want_t.items():
-            if not cand: break
-            diff = np.array([np.abs(c[0] - s).mean() for c in cand])
-            ok = [i for i in range(len(cand)) if diff[i] <= max_diff]
-            if not ok: print('NOTEX', d.name, f'best {diff.min():.3f}'); continue
-            # the cache holds low-res copies of the same picture: exact original size first, else the largest close match
-            same = [i for i in ok if size and cand[i][3] == size]
-            i = min(same, key=lambda i: diff[i]) if same else max(ok, key=lambda i: (cand[i][3][0] * cand[i][3][1], -diff[i]))
-            if size and cand[i][3] != size: print('TEX size', d.name, cand[i][3], 'wanted', size)
-            _, k, body, _ = cand[i]
-            if k == 'png': (d / 'tex.png').write_bytes(body)
-            else: ktx2_png(body, d / 'tex.png')
-            nt += 1
-    shutil.rmtree(tmp, ignore_errors=True)
+            for d in want_m.pop(tuple(vt), []): shutil.copy(o, d / 'mesh.obj'); nm += 1
+        if want_t:
+            cand = []
+            for i, (k, body) in enumerate(got):
+                if k not in ('ktx', 'png'): continue
+                try:
+                    if k == 'png': im = Image.open(io.BytesIO(body))
+                    else: ktx2_png(body, tmp / 't.png'); im = Image.open(tmp / 't.png')
+                    im.load(); cand.append((np.asarray(im.convert('RGB').resize((16, 16), Image.BILINEAR), dtype=np.float32) / 255, k, body, im.size))
+                except Exception: continue
+            for d, (s, size) in want_t.items():
+                if not cand: break
+                diff = np.array([np.abs(c[0] - s).mean() for c in cand])
+                ok = [i for i in range(len(cand)) if diff[i] <= max_diff]
+                if not ok: print('NOTEX', d.name, f'best {diff.min():.3f}'); continue
+                # the cache holds low-res copies of the same picture: exact original size first, else the largest close match
+                same = [i for i in ok if size and cand[i][3] == size]
+                i = min(same, key=lambda i: diff[i]) if same else max(ok, key=lambda i: (cand[i][3][0] * cand[i][3][1], -diff[i]))
+                if size and cand[i][3] != size: print('TEX size', d.name, cand[i][3], 'wanted', size)
+                _, k, body, _ = cand[i]
+                if k == 'png': (d / 'tex.png').write_bytes(body)
+                else: ktx2_png(body, d / 'tex.png')
+                nt += 1
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
     for (v, tr), ds in want_m.items():
         for d in ds: print('NOMESH (cache scan)', d.name, 'verts', v, 'tris', tr)
     print(f'cache scan: {nm} meshes, {nt} textures')

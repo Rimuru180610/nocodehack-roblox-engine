@@ -4,8 +4,9 @@ import importlib.util, os, shutil, subprocess, sys
 from pathlib import Path
 
 E = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(E))
-BL = os.environ.get('BLENDER', 'C:/Program Files/Blender Foundation/Blender 5.2/blender.exe')   # same default as story.py
+sys.path.insert(0, str(E)); sys.path.insert(0, str(Path(__file__).resolve().parent))
+from env_paths import find_blender
+BL = find_blender()   # same default as story.py
 LIBS = {'assets/r6_parts.blend': 'R6 body parts (tools/extract_r6_parts.py)', 'assets/hair': 'hair library', 'assets/faces': 'face library',
         'assets/outfits': 'clothes library', 'assets/anims': 'animation library', 'assets/rbxsets': 'Roblox sets'}
 

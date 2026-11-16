@@ -8,7 +8,9 @@ try: import bpy
 except ImportError:   # plain Python: render the rows in Blender, then label + stack them
     import os, subprocess
     from PIL import Image, ImageDraw
-    BL = os.environ.get('BLENDER', 'C:/Program Files/Blender Foundation/Blender 5.2/blender.exe')
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from env_paths import find_blender
+    BL = find_blender()
     out = Path(sys.argv[1]).resolve()
     r = subprocess.run([BL, '-b', '--factory-startup', '--offline-mode', '--python-exit-code', '1', '-P', __file__, '--', str(out)] + sys.argv[2:], capture_output=True, text=True)
     rows = [l.split('|') for l in r.stdout.splitlines() if l.startswith('ROW|')]

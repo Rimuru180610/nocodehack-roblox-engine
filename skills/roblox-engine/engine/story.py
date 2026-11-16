@@ -10,7 +10,9 @@ from pathlib import Path
 import look
 
 E = Path(__file__).resolve().parent
-BL = os.environ.get('BLENDER', 'C:/Program Files/Blender Foundation/Blender 5.2/blender.exe')   # BLENDER overrides (cloud_regress runs on Linux)
+sys.path.insert(0, str(E / 'tools'))
+from env_paths import find_blender
+BL = find_blender()   # BLENDER env var overrides (Linux/macOS/Windows auto-detected)
 
 
 def frames_arg(argv):

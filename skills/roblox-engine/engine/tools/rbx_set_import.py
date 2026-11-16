@@ -33,9 +33,7 @@ def asset_num(s):
 # ------------------------------------------------------------------ fetch (plain python)
 def studio_log():
     import hair_studio as hs
-    logs_ = list((hs.RBX / 'logs').glob('*Studio*'))
-    if not logs_: raise SystemExit('no Roblox Studio logs found - open Studio and run the set export first')
-    return max(logs_, key=lambda p: p.stat().st_mtime)
+    return max(hs.studio_logs(), key=lambda p: p.stat().st_mtime)
 
 
 def parse_log(aid):
@@ -58,23 +56,8 @@ def parse_log(aid):
 
 def cache_candidates(t0, t1):
     """(mtime_ms, kind, body) of every content-cache payload written/read in [t0, t1]."""
-    import hair_studio as hs, shutil, sqlite3, tempfile
-    got = []
-    for f in (hs.RBX / 'rbx-storage').glob('*/*'):
-        t = f.stat().st_mtime * 1000
-        if t0 <= t <= t1:
-            k, body = hs.payload(f.read_bytes())
-            if k: got.append((t, k, body))
-    tmp = Path(tempfile.mkdtemp())
-    for ext in ('', '-wal', '-shm'):
-        p = hs.RBX / f'rbx-storage.db{ext}'
-        if p.exists(): shutil.copy(p, tmp / f'db{ext}')
-    c = sqlite3.connect(tmp / 'db')
-    for t, content in c.execute('select atime, content from files where atime between ? and ? and content is not null', (t0, t1)):
-        k, body = hs.payload(content)
-        if k: got.append((t, k, body))
-    c.close(); shutil.rmtree(tmp, ignore_errors=True)
-    return got
+    import hair_studio as hs
+    return hs.cache_entries(t0, t1)
 
 
 def obj_bbox(path):

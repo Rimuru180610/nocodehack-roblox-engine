@@ -1,9 +1,9 @@
 """check_update.py - is a newer NoCodeHack engine on GitHub? Reads one public file (the version number); sends nothing.
   python tools/check_update.py      -> "UPDATE <new> (you have <old>)" or "OK <version>"; offline/any error -> "OK (no check)"."""
-import urllib.request
+import os, urllib.request
 from pathlib import Path
 
-URL = 'https://raw.githubusercontent.com/nocodehack/nocodehack-roblox-engine/main/skills/roblox-engine/engine/VERSION'
+URL = os.environ.get('ENGINE_UPDATE_URL', 'https://raw.githubusercontent.com/nocodehack/nocodehack-roblox-engine/main/skills/roblox-engine/engine/VERSION')
 
 
 def ver(s): return tuple(int(x) for x in s.strip().split('.'))
